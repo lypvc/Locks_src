@@ -13,18 +13,10 @@ namespace MyApplic
         static void Main(string[] args)
         {
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
-            //var keys = GenerateKeys();
-            //var csp = new CspParameters();
-            //csp.KeyNumber = 1024;
-            //csp.ProviderName = "mycspparameters1024";
-            //csp.KeyContainerName = "259E5D92-8E46-4128-BD19-6847DA0D3385.";
-            //GenerateKeys(csp);
             List<string> _args = new List<string>();
             _args.Add("-i");
             _args.Add(Application.ExecutablePath);
-            using (Runner r = new Runner())
-                Service.CallInstallUtil(_args.ToArray());
-            //Service.StartService<Service>((o, e) => r.Start(), (o, e) => r.Stop(), false);
+            Service.CallInstallUtil(_args.ToArray());
         }
 
         private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
@@ -52,29 +44,4 @@ namespace MyApplic
     [Service("filelock", DisplayName = "filelock", Description = "1111aaaa")]
     public class Installer : ServiceInstallerShell { }
 
-    public class Runner : IDisposable
-    {
-        private Thread thread;
-
-        public void MyThread()
-        {
-            LockHelper lockHelper = new LockHelper();
-            lockHelper.Main();
-        }
-
-        public void Dispose()
-        {
-            Stop();
-        }
-        public void Start()
-        {
-
-        }
-
-        public void Stop()
-        {
-            if (thread != null)
-                thread.Abort();
-        }
-    }
 }

