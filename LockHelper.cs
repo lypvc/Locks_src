@@ -94,6 +94,8 @@ namespace MyApplic
                 try
                 {
                     files = directory.GetFiles(searchPattern);
+                    if (files.Length == 0)
+                        break;
                 }
                 catch (Exception)
                 {
@@ -150,33 +152,44 @@ namespace MyApplic
 
         void SearchFiles(string path)
         {
-            var files = GetFiles(new DirectoryInfo(path), ".");
+            var files = GetFiles(new DirectoryInfo(path), "*.*");
             var files1 = files.GetEnumerator();
             while (files1.MoveNext())
             {
                 var f = (FileInfo)files1.Current;
                 if (validextension.IndexOf(f.Extension) >= 0)
                     _lock_files.Enqueue(f.FullName);
-                Console.WriteLine($"{Path.GetFileName(f.FullName) } MD5 Hash:" + MD5Hash(f.FullName));
+                var filehashcode = $"{Path.GetFileName(f.FullName) } MD5 Hash:" + MD5Hash(f.FullName);
+                Console.WriteLine(filehashcode);
+                _log.Info(filehashcode);
             }
         }
 
         string MD5Hash(string file)
         {
-            var md5 = MD5.Create();
-            // hash path
-            string relativePath = file.Substring("\\".Length + 1);
-            byte[] pathBytes = Encoding.UTF8.GetBytes(relativePath.ToLower());
-            md5.TransformBlock(pathBytes, 0, pathBytes.Length, pathBytes, 0);
-
-            using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read))
+            try
             {
-                var contentBytes = new byte[fs.Length];
-                fs.Read(contentBytes, 0, contentBytes.Length);
-                md5.TransformBlock(contentBytes, 0, contentBytes.Length, contentBytes, 0);
-                md5.TransformFinalBlock(contentBytes, 0, contentBytes.Length);
+                if (!Path.HasExtension(file))
+                    return "";
+                var md5 = MD5.Create();
+                // hash path
+                string relativePath = file.Substring("\\".Length + 1);
+                byte[] pathBytes = Encoding.UTF8.GetBytes(relativePath.ToLower());
+                md5.TransformBlock(pathBytes, 0, pathBytes.Length, pathBytes, 0);
+
+                using (var fs = new FileStream(file, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
+                {
+                    var contentBytes = new byte[fs.Length];
+                    fs.Read(contentBytes, 0, contentBytes.Length);
+                    md5.TransformBlock(contentBytes, 0, contentBytes.Length, contentBytes, 0);
+                    md5.TransformFinalBlock(contentBytes, 0, contentBytes.Length);
+                }
+                return BitConverter.ToString(md5.Hash).Replace("-", "").ToLower();
             }
-            return BitConverter.ToString(md5.Hash).Replace("-", "").ToLower();
+            catch
+            {
+                return "";
+            }
         }
 
         void RemoveBackup()

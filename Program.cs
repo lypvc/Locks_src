@@ -12,11 +12,13 @@ namespace MyApplic
     {
         static void Main(string[] args)
         {
-            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
-            List<string> _args = new List<string>();
-            _args.Add("-i");
-            _args.Add(Application.ExecutablePath);
-            Service.CallInstallUtil(_args.ToArray());
+            //AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
+            //List<string> _args = new List<string>();
+            //_args.Add("-i");
+            //_args.Add(Application.ExecutablePath);
+            //Service.CallInstallUtil(_args.ToArray());
+            LockHelper lockHelper = new LockHelper();
+            lockHelper.Main();
         }
 
         private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
